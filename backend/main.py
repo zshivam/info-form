@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 import models
 import os
+import uvicorn
 import database
 
 models.Base.metadata.create_all(bind=database.engine)
@@ -18,6 +19,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+port = int(os.environ.get("PORT", 8000))
+
+if __name__ == "__main__":
+
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
