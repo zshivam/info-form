@@ -47,7 +47,7 @@ const submitForm = async () => {
   form_Data.append("image", Image.value)
 
   try {
-    await axios.post("http://127.0.0.1:8000/submit/", form_Data, {
+    await axios.post("https://info-form-cq6u.onrender.com", form_Data, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
