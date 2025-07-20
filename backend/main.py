@@ -14,7 +14,7 @@ app = FastAPI()
 # Allow frontend to call backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # removed /info-form
+    allow_origins=["https://info-form-cq6u.onrender.com"],  # removed /info-form
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
