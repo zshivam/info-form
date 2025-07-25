@@ -12,7 +12,7 @@ const Records = ref([])
 
 const loadRecords = async () => {
   try{
-  const res =await axios.get("http://127.0.0.1:8000/records");
+  const res =await axios.get("railway link -p 66c8b3fa-c0c7-40ca-a176-2a62c3f23c0d");
 
   Records.value = res.data
   } catch (error) {
