@@ -14,7 +14,7 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
    allow_origins=[
-    "http://localhost:5173",  # local
+    "info-form-production.up.railway.app",  # local
     "https://info-form-9q9n.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
