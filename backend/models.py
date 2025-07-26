@@ -13,3 +13,4 @@ class FormData(Base):
     address = Column(String, index=True)
     contact = Column(Integer, index=True)
     image = Column(String, nullable=False)
+    
