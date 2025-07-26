@@ -13,7 +13,9 @@ app = FastAPI()
 # Allow frontend to call backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173/info-form"],  # removed /info-form
+   allow_origins=[
+    "http://localhost:5173",  # local
+    "https://info-form-9q9n.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
