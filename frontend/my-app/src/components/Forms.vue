@@ -47,7 +47,7 @@ const submitForm = async () => {
   form_Data.append("image", Image.value)
 
   try {
-    await axios.post("http://localhost:5000", form_Data, {
+    await axios.post("https://info-form.up.railway.app/records/", form_Data, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
