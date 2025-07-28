@@ -16,6 +16,8 @@
 </template>
 
 <script setup>
+
+
 import axios from 'axios'
 import { ref } from 'vue'
 
@@ -46,6 +48,10 @@ const submitForm = async () => {
   form_Data.append("contact", Contact.value)
   form_Data.append("image", Image.value)
 
+  if (!Name.value || !Address.value || !Contact.value || !Image.value) {
+    alert("Please fill in all fields and select an image.")
+    return
+  }
   try {
     await axios.post("https://info-form.up.railway.app/records/", form_Data, {
       headers: {
@@ -63,6 +69,7 @@ const submitForm = async () => {
     console.error("Error saving data:", error)
     alert("Failed to save data.")
   }
+  
 }
 </script>
 
