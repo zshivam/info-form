@@ -10,16 +10,11 @@ models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI()
 
-origins = [
-    "https://info-form-9q9n.vercel.app", 
-    "http://localhost:5173",              
-]
-
 
 # Allow frontend to call backend
 app.add_middleware(
     CORSMiddleware,
-   allow_origins= origins,
+   allow_origins= ["https://info-form-9q9n.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
