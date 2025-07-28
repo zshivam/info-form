@@ -18,11 +18,11 @@ DB_NAME = os.getenv("DB_NAME")
 if not all([DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME]):
     raise ValueError("Missing database configuration in .env file")
 
-# Build connection string
+
 SQLALCHEMY_DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
-# Debug print (optional)
-print("✅ DB URL:", SQLALCHEMY_DATABASE_URL)
+#print for debugging
+print("DB URL:", SQLALCHEMY_DATABASE_URL)
 
 # Setup SQLAlchemy
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
