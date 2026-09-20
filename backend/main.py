@@ -1,16 +1,18 @@
-from fastapi import FastAPI, Depends, Form, UploadFile, File, HTTPException
+from fastapi import FastAPI, Form, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy.orm import Session
 from pathlib import Path
-import models
+from datetime import datetime
+from bson import ObjectId
+import re
 import os
 import uuid
+import base64
+
 import database
+from models import record_helper
 
-models.Base.metadata.create_all(bind=database.engine)
-
-app = FastAPI(title="Info Form API")
+app = FastAPI(title="Info Form API (MongoDB)")
 
 # Allow frontend origins: production, Vercel previews, and local development
 allowed_origins = [
@@ -39,17 +41,9 @@ try:
 except Exception:
     pass
 
-# Serve uploaded files if directory exists
+# Mount static files folder if directory exists
 if os.path.exists(UPLOAD_FOLDER):
     app.mount("/uploads", StaticFiles(directory=UPLOAD_FOLDER), name="uploads")
-
-# Dependency
-def get_db():
-    db = database.SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 @app.get("/")
 @app.get("/api")
@@ -57,11 +51,12 @@ def get_db():
 def read_root():
     return {
         "status": "healthy",
-        "message": "Info Form API is operational on Vercel Serverless",
+        "database": "MongoDB",
+        "message": "Info Form API is operational with MongoDB",
         "endpoints": {
             "submit": "POST /submit/ or POST /api/submit/",
             "records": "GET /records/ or GET /api/records/",
-            "uploads": "GET /uploads/{filename}"
+            "delete": "DELETE /records/{id}/ or DELETE /api/records/{id}/"
         }
     }
 
@@ -74,15 +69,13 @@ def submit_form(
     email: str = Form(None),
     category: str = Form("General"),
     notes: str = Form(None),
-    image: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    image: UploadFile = File(...)
 ):
     try:
         image_bytes = image.file.read()
 
-        # Check if running in Serverless environment or save as data URI to guarantee persistence
-        # Data URI allows image to be stored directly in DB, 100% resilient across serverless instances
-        import base64
+        # Encode image to Base64 data URI so image is stored directly in MongoDB document
+        # This guarantees 100% permanence and eliminates ephemeral disk issues on Vercel Serverless
         content_type = image.content_type or "image/jpeg"
         base64_encoded = base64.b64encode(image_bytes).decode("utf-8")
         image_data_uri = f"data:{content_type};base64,{base64_encoded}"
@@ -99,64 +92,68 @@ def submit_form(
         except Exception:
             pass
 
-        # Use image_data_uri so images display permanently on Vercel
-        form_data = models.FormData(
-            name=name,
-            address=address,
-            contact=contact,
-            email=email if email and email.strip() else None,
-            category=category if category and category.strip() else "General",
-            notes=notes if notes and notes.strip() else None,
-            image=image_data_uri
-        )
-        db.add(form_data)
-        db.commit()
-        db.refresh(form_data)
+        record_doc = {
+            "name": name,
+            "address": address,
+            "contact": contact,
+            "email": email.strip() if email and email.strip() else None,
+            "category": category.strip() if category and category.strip() else "General",
+            "notes": notes.strip() if notes and notes.strip() else None,
+            "image": image_data_uri,
+            "created_at": datetime.utcnow().isoformat()
+        }
 
-        return {"message": "Data saved successfully", "record_id": form_data.id}
+        col = database.get_collection("records")
+        res = col.insert_one(record_doc)
+
+        return {"message": "Data saved successfully", "record_id": str(res.inserted_id)}
     except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to save record: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to save record to MongoDB: {str(e)}")
 
 @app.get("/records/")
 @app.get("/api/records/")
 def get_records(
     category: str = None,
-    search: str = None,
-    db: Session = Depends(get_db)
+    search: str = None
 ):
-    query = db.query(models.FormData)
-    if category and category != "All":
-        query = query.filter(models.FormData.category == category)
-    if search:
-        search_pattern = f"%{search}%"
-        query = query.filter(
-            (models.FormData.name.ilike(search_pattern)) |
-            (models.FormData.address.ilike(search_pattern)) |
-            (models.FormData.email.ilike(search_pattern)) |
-            (models.FormData.notes.ilike(search_pattern))
-        )
-    return query.order_by(models.FormData.id.desc()).all()
+    try:
+        col = database.get_collection("records")
+        query = {}
+
+        if category and category != "All":
+            query["category"] = category
+
+        if search and search.strip():
+            pattern = re.compile(re.escape(search.strip()), re.IGNORECASE)
+            query["$or"] = [
+                {"name": pattern},
+                {"address": pattern},
+                {"email": pattern},
+                {"notes": pattern},
+                {"category": pattern}
+            ]
+
+        cursor = col.find(query).sort("_id", -1)
+        records = [record_helper(doc) for doc in cursor]
+        return records
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch records from MongoDB: {str(e)}")
 
 @app.delete("/records/{record_id}/")
 @app.delete("/api/records/{record_id}/")
-def delete_record(record_id: int, db: Session = Depends(get_db)):
-    record = db.query(models.FormData).filter(models.FormData.id == record_id).first()
-    if not record:
-        raise HTTPException(status_code=404, detail="Record not found")
+def delete_record(record_id: str):
+    try:
+        if not ObjectId.is_valid(record_id):
+            raise HTTPException(status_code=400, detail="Invalid record ID format")
 
-    # Optionally remove local file if present
-    if record.image and not record.image.startswith("data:"):
-        image_path = os.path.join(UPLOAD_FOLDER, record.image)
-        if os.path.exists(image_path):
-            try:
-                os.remove(image_path)
-            except OSError:
-                pass
+        col = database.get_collection("records")
+        res = col.delete_one({"_id": ObjectId(record_id)})
 
-    db.delete(record)
-    db.commit()
-    return {"message": "Record deleted successfully", "id": record_id}
+        if res.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Record not found")
 
-
-
+        return {"message": "Record deleted successfully", "id": record_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete record: {str(e)}")

@@ -1,40 +1,30 @@
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from dotenv import load_dotenv
 import os
+from dotenv import load_dotenv
+from pymongo import MongoClient
 
-# Load .env file
+# Load environment variables
 load_dotenv()
 
-# Read environment variables
-DATABASE_URL = os.getenv("DATABASE_URL")
-if DATABASE_URL:
-    # SQLAlchemy requires 'postgresql://' instead of legacy 'postgres://'
-    if DATABASE_URL.startswith("postgres://"):
-        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-    SQLALCHEMY_DATABASE_URL = DATABASE_URL
-else:
-    DB_USER = os.getenv("DB_USER")
-    DB_PASSWORD = os.getenv("DB_PASSWORD")
-    DB_HOST = os.getenv("DB_HOST")
-    DB_PORT = os.getenv("DB_PORT", "5432")
-    DB_NAME = os.getenv("DB_NAME")
+# MongoDB Connection URI (Supports MONGODB_URI or MONGO_URI)
+# Example for MongoDB Atlas: mongodb+srv://<username>:<password>@cluster0.mongodb.net/?retryWrites=true&w=majority
+MONGODB_URI = os.getenv("MONGODB_URI") or os.getenv("MONGO_URI") or "mongodb://localhost:27017"
+DB_NAME = os.getenv("DB_NAME", "info_form_db")
 
-    if all([DB_USER, DB_PASSWORD, DB_HOST, DB_NAME]):
-        SQLALCHEMY_DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-    else:
-        # Fallback for local development if PostgreSQL credentials are not set
-        SQLALCHEMY_DATABASE_URL = "sqlite:///./sql_app.db"
-        print("Note: PostgreSQL configuration not found in .env, falling back to SQLite (sqlite:///./sql_app.db)")
+safe_uri = MONGODB_URI.split("@")[-1] if "@" in MONGODB_URI else MONGODB_URI
+print(f"MongoDB target: {safe_uri} (database: {DB_NAME})")
 
-# Safe debug log without exposing passwords
-safe_url = SQLALCHEMY_DATABASE_URL.split("@")[-1] if "@" in SQLALCHEMY_DATABASE_URL else SQLALCHEMY_DATABASE_URL
-print(f"Database target: {safe_url}")
+_client = None
+_db = None
 
-# Setup SQLAlchemy
-connect_args = {"check_same_thread": False} if SQLALCHEMY_DATABASE_URL.startswith("sqlite") else {}
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args=connect_args)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+def get_database():
+    """Returns singleton MongoDB database instance"""
+    global _client, _db
+    if _db is None:
+        _client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=5000)
+        _db = _client[DB_NAME]
+    return _db
 
+def get_collection(collection_name="records"):
+    """Returns a collection from the database"""
+    database = get_database()
+    return database[collection_name]
