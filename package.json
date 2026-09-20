@@ -1,0 +1,10 @@
+{
+  "name": "info-form-workspace",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "npm --prefix frontend/my-app run dev",
+    "build": "npm --prefix frontend/my-app run build",
+    "preview": "npm --prefix frontend/my-app run preview"
+  }
+}
