@@ -2,9 +2,13 @@
   "name": "info-form-workspace",
   "private": true,
   "version": "1.0.0",
+  "workspaces": [
+    "frontend/my-app"
+  ],
   "scripts": {
-    "dev": "npm --prefix frontend/my-app run dev",
+    "postinstall": "npm --prefix frontend/my-app install",
     "build": "npm --prefix frontend/my-app run build",
+    "dev": "npm --prefix frontend/my-app run dev",
     "preview": "npm --prefix frontend/my-app run preview"
   }
 }
