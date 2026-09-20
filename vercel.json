@@ -1,7 +1,6 @@
 {
-  "installCommand": "npm --prefix frontend/my-app install",
-  "buildCommand": "npm --prefix frontend/my-app run build",
-  "outputDirectory": "frontend/my-app/dist",
+  "installCommand": "if [ -d \"frontend/my-app\" ]; then npm --prefix frontend/my-app install; else echo 'Skipping frontend install'; fi",
+  "buildCommand": "if [ -d \"frontend/my-app\" ]; then npm --prefix frontend/my-app run build; else echo 'Skipping frontend build'; fi",
   "rewrites": [
     {
       "source": "/api/:match*",
@@ -18,10 +17,6 @@
     {
       "source": "/uploads/:match*",
       "destination": "/api/index.py"
-    },
-    {
-      "source": "/((?!assets|vite\\.svg|favicon\\.ico).*)",
-      "destination": "/index.html"
     }
   ]
 }
