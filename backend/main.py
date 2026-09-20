@@ -33,11 +33,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-UPLOAD_FOLDER = "uploads"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "/tmp/uploads" if "VERCEL" in os.environ else "uploads")
+try:
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+except Exception:
+    pass
 
-# Serve uploaded files
-app.mount("/uploads", StaticFiles(directory=UPLOAD_FOLDER), name="uploads")
+# Serve uploaded files if directory exists
+if os.path.exists(UPLOAD_FOLDER):
+    app.mount("/uploads", StaticFiles(directory=UPLOAD_FOLDER), name="uploads")
 
 # Dependency
 def get_db():
@@ -48,18 +52,21 @@ def get_db():
         db.close()
 
 @app.get("/")
+@app.get("/api")
+@app.get("/api/")
 def read_root():
     return {
         "status": "healthy",
-        "message": "Info Form API is operational",
+        "message": "Info Form API is operational on Vercel Serverless",
         "endpoints": {
-            "submit": "POST /submit/",
-            "records": "GET /records/",
+            "submit": "POST /submit/ or POST /api/submit/",
+            "records": "GET /records/ or GET /api/records/",
             "uploads": "GET /uploads/{filename}"
         }
     }
 
 @app.post("/submit/")
+@app.post("/api/submit/")
 def submit_form(
     name: str = Form(...),
     address: str = Form(""),
@@ -71,16 +78,28 @@ def submit_form(
     db: Session = Depends(get_db)
 ):
     try:
-        # Generate safe unique filename to prevent path traversal and overwriting
+        image_bytes = image.file.read()
+
+        # Check if running in Serverless environment or save as data URI to guarantee persistence
+        # Data URI allows image to be stored directly in DB, 100% resilient across serverless instances
+        import base64
+        content_type = image.content_type or "image/jpeg"
+        base64_encoded = base64.b64encode(image_bytes).decode("utf-8")
+        image_data_uri = f"data:{content_type};base64,{base64_encoded}"
+
+        # Also write to local uploads folder if available
         original_ext = Path(image.filename).suffix if image.filename else ".jpg"
         if not original_ext:
             original_ext = ".jpg"
         unique_filename = f"{uuid.uuid4().hex}{original_ext}"
-        image_path = os.path.join(UPLOAD_FOLDER, unique_filename)
+        try:
+            image_path = os.path.join(UPLOAD_FOLDER, unique_filename)
+            with open(image_path, "wb") as f:
+                f.write(image_bytes)
+        except Exception:
+            pass
 
-        with open(image_path, "wb") as f:
-            f.write(image.file.read())
-
+        # Use image_data_uri so images display permanently on Vercel
         form_data = models.FormData(
             name=name,
             address=address,
@@ -88,7 +107,7 @@ def submit_form(
             email=email if email and email.strip() else None,
             category=category if category and category.strip() else "General",
             notes=notes if notes and notes.strip() else None,
-            image=unique_filename
+            image=image_data_uri
         )
         db.add(form_data)
         db.commit()
@@ -100,6 +119,7 @@ def submit_form(
         raise HTTPException(status_code=500, detail=f"Failed to save record: {str(e)}")
 
 @app.get("/records/")
+@app.get("/api/records/")
 def get_records(
     category: str = None,
     search: str = None,
@@ -119,13 +139,14 @@ def get_records(
     return query.order_by(models.FormData.id.desc()).all()
 
 @app.delete("/records/{record_id}/")
+@app.delete("/api/records/{record_id}/")
 def delete_record(record_id: int, db: Session = Depends(get_db)):
     record = db.query(models.FormData).filter(models.FormData.id == record_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Record not found")
 
     # Optionally remove local file if present
-    if record.image:
+    if record.image and not record.image.startswith("data:"):
         image_path = os.path.join(UPLOAD_FOLDER, record.image)
         if os.path.exists(image_path):
             try:
@@ -136,5 +157,6 @@ def delete_record(record_id: int, db: Session = Depends(get_db)):
     db.delete(record)
     db.commit()
     return {"message": "Record deleted successfully", "id": record_id}
+
 
 

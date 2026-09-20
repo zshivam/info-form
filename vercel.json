@@ -1,0 +1,26 @@
+{
+  "buildCommand": "npm --prefix frontend/my-app run build",
+  "outputDirectory": "frontend/my-app/dist",
+  "rewrites": [
+    {
+      "source": "/api/:match*",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/submit/:match*",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/records/:match*",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/uploads/:match*",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/((?!assets|vite\\.svg|favicon\\.ico).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
