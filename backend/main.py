@@ -12,24 +12,12 @@ import base64
 import database
 from models import record_helper
 
-app = FastAPI(title="Info Form API (MongoDB)")
+app = FastAPI(title="Info Form API")
 
-# Allow frontend origins: production, Vercel previews, and local development
-allowed_origins = [
-    "https://info-form-9q9n.vercel.app",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
-env_origins = os.getenv("ALLOWED_ORIGINS", "")
-if env_origins:
-    allowed_origins.extend([o.strip() for o in env_origins.split(",") if o.strip()])
-
+# Allow all origins for seamless Vercel previews and deployments
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_origin_regex=r"https://.*\.vercel\.app",
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -41,7 +29,6 @@ try:
 except Exception:
     pass
 
-# Mount static files folder if directory exists
 if os.path.exists(UPLOAD_FOLDER):
     app.mount("/uploads", StaticFiles(directory=UPLOAD_FOLDER), name="uploads")
 
@@ -49,10 +36,11 @@ if os.path.exists(UPLOAD_FOLDER):
 @app.get("/api")
 @app.get("/api/")
 def read_root():
+    using_memory = database.is_using_memory()
     return {
         "status": "healthy",
-        "database": "MongoDB",
-        "message": "Info Form API is operational with MongoDB",
+        "database": "in-memory (set MONGODB_URI to persist)" if using_memory else "MongoDB Atlas",
+        "message": "Info Form API is operational on Vercel",
         "endpoints": {
             "submit": "POST /submit/ or POST /api/submit/",
             "records": "GET /records/ or GET /api/records/",
@@ -60,7 +48,9 @@ def read_root():
         }
     }
 
+@app.post("/submit")
 @app.post("/submit/")
+@app.post("/api/submit")
 @app.post("/api/submit/")
 def submit_form(
     name: str = Form(...),
@@ -74,23 +64,10 @@ def submit_form(
     try:
         image_bytes = image.file.read()
 
-        # Encode image to Base64 data URI so image is stored directly in MongoDB document
-        # This guarantees 100% permanence and eliminates ephemeral disk issues on Vercel Serverless
+        # Convert image to Base64 data URI to guarantee 100% persistence on Vercel Serverless
         content_type = image.content_type or "image/jpeg"
         base64_encoded = base64.b64encode(image_bytes).decode("utf-8")
         image_data_uri = f"data:{content_type};base64,{base64_encoded}"
-
-        # Also write to local uploads folder if available
-        original_ext = Path(image.filename).suffix if image.filename else ".jpg"
-        if not original_ext:
-            original_ext = ".jpg"
-        unique_filename = f"{uuid.uuid4().hex}{original_ext}"
-        try:
-            image_path = os.path.join(UPLOAD_FOLDER, unique_filename)
-            with open(image_path, "wb") as f:
-                f.write(image_bytes)
-        except Exception:
-            pass
 
         record_doc = {
             "name": name,
@@ -104,13 +81,19 @@ def submit_form(
         }
 
         col = database.get_collection("records")
-        res = col.insert_one(record_doc)
+        if col is not None:
+            res = col.insert_one(record_doc)
+            rec_id = str(res.inserted_id)
+        else:
+            rec_id = database.memory_insert(record_doc)
 
-        return {"message": "Data saved successfully", "record_id": str(res.inserted_id)}
+        return {"message": "Data saved successfully", "record_id": rec_id}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save record to MongoDB: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to save record: {str(e)}")
 
+@app.get("/records")
 @app.get("/records/")
+@app.get("/api/records")
 @app.get("/api/records/")
 def get_records(
     category: str = None,
@@ -118,39 +101,59 @@ def get_records(
 ):
     try:
         col = database.get_collection("records")
-        query = {}
+        if col is not None:
+            query = {}
+            if category and category != "All":
+                query["category"] = category
 
-        if category and category != "All":
-            query["category"] = category
+            if search and search.strip():
+                pattern = re.compile(re.escape(search.strip()), re.IGNORECASE)
+                query["$or"] = [
+                    {"name": pattern},
+                    {"address": pattern},
+                    {"email": pattern},
+                    {"notes": pattern},
+                    {"category": pattern}
+                ]
 
-        if search and search.strip():
-            pattern = re.compile(re.escape(search.strip()), re.IGNORECASE)
-            query["$or"] = [
-                {"name": pattern},
-                {"address": pattern},
-                {"email": pattern},
-                {"notes": pattern},
-                {"category": pattern}
-            ]
-
-        cursor = col.find(query).sort("_id", -1)
-        records = [record_helper(doc) for doc in cursor]
-        return records
+            cursor = col.find(query).sort("_id", -1)
+            return [record_helper(doc) for doc in cursor]
+        else:
+            # In-memory store fallback
+            raw = database.memory_find({"category": category} if category and category != "All" else None)
+            if search and search.strip():
+                q = search.strip().lower()
+                raw = [
+                    r for r in raw
+                    if q in r.get("name", "").lower()
+                    or q in r.get("address", "").lower()
+                    or q in str(r.get("contact", "")).lower()
+                    or q in (r.get("email") or "").lower()
+                    or q in (r.get("notes") or "").lower()
+                    or q in r.get("category", "").lower()
+                ]
+            return [record_helper(doc) for doc in raw]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch records from MongoDB: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch records: {str(e)}")
 
+@app.delete("/records/{record_id}")
 @app.delete("/records/{record_id}/")
+@app.delete("/api/records/{record_id}")
 @app.delete("/api/records/{record_id}/")
 def delete_record(record_id: str):
     try:
-        if not ObjectId.is_valid(record_id):
-            raise HTTPException(status_code=400, detail="Invalid record ID format")
-
         col = database.get_collection("records")
-        res = col.delete_one({"_id": ObjectId(record_id)})
+        if col is not None:
+            if not ObjectId.is_valid(record_id):
+                raise HTTPException(status_code=400, detail="Invalid record ID format")
 
-        if res.deleted_count == 0:
-            raise HTTPException(status_code=404, detail="Record not found")
+            res = col.delete_one({"_id": ObjectId(record_id)})
+            if res.deleted_count == 0:
+                raise HTTPException(status_code=404, detail="Record not found")
+        else:
+            deleted = database.memory_delete(record_id)
+            if not deleted:
+                raise HTTPException(status_code=404, detail="Record not found")
 
         return {"message": "Record deleted successfully", "id": record_id}
     except HTTPException:
