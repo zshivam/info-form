@@ -1,6 +1,7 @@
 {
-  "installCommand": "if [ -d \"frontend/my-app\" ]; then npm --prefix frontend/my-app install; else echo 'Skipping frontend install'; fi",
-  "buildCommand": "if [ -d \"frontend/my-app\" ]; then npm --prefix frontend/my-app run build; else echo 'Skipping frontend build'; fi",
+  "installCommand": "npm --prefix frontend/my-app install",
+  "buildCommand": "npm --prefix frontend/my-app run build",
+  "outputDirectory": "frontend/my-app/dist",
   "rewrites": [
     {
       "source": "/api/:match*",
@@ -12,10 +13,6 @@
     },
     {
       "source": "/records/:match*",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/uploads/:match*",
       "destination": "/api/index.py"
     }
   ]
