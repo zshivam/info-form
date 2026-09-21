@@ -9,7 +9,7 @@ __pycache__/
 node_modules/
 
 # Ignore dist or build folders
-
-
+dist/
+.vercel
 # Ignore uploads folder
 uploads/
