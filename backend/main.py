@@ -1,6 +1,5 @@
 from fastapi import FastAPI, Form, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from datetime import datetime
 from bson import ObjectId
@@ -29,8 +28,6 @@ try:
 except Exception:
     pass
 
-if os.path.exists(UPLOAD_FOLDER):
-    app.mount("/uploads", StaticFiles(directory=UPLOAD_FOLDER), name="uploads")
 
 @app.get("/")
 @app.get("/api")
