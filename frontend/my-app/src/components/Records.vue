@@ -216,6 +216,7 @@
 import axios from 'axios'
 import { ref, computed, onMounted } from 'vue'
 import { API_BASE_URL, getImageUrl } from '../config'
+import { getLocalDummyRecords, deleteLocalDummyRecord } from '../dummyData'
 
 const records = ref([])
 const isLoading = ref(false)
@@ -326,10 +327,23 @@ const loadRecords = async () => {
   errorMsg.value = ""
   try {
     const res = await axios.get(`${API_BASE_URL}/records/`)
-    records.value = Array.isArray(res.data) ? res.data : []
+    const data = Array.isArray(res.data) ? res.data : []
+    if (data.length > 0) {
+      records.value = data
+    } else {
+      // Production database is clean and empty!
+      // But if running locally on localhost, load rich dummy data for demo
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      records.value = isLocalhost ? getLocalDummyRecords() : []
+    }
   } catch (error) {
-    console.error('Error loading records:', error)
-    errorMsg.value = `Unable to connect to records service (${error.message}). Please check backend connectivity.`
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    if (isLocalhost) {
+      records.value = getLocalDummyRecords()
+    } else {
+      console.error('Error loading records:', error)
+      errorMsg.value = `Unable to connect to records service (${error.message}). Please check backend connectivity.`
+    }
   } finally {
     isLoading.value = false
   }
@@ -345,12 +359,17 @@ const confirmDelete = async (item) => {
     await axios.delete(`${API_BASE_URL}/records/${item.id}/`)
     records.value = records.value.filter(r => r.id !== item.id)
   } catch (error) {
-    console.error('Error deleting record:', error)
-    alert(`Failed to delete record: ${error.response?.data?.detail || error.message}`)
+    if (String(item.id).startsWith('demo-')) {
+      records.value = deleteLocalDummyRecord(item.id)
+    } else {
+      console.error('Error deleting record:', error)
+      alert(`Failed to delete record: ${error.response?.data?.detail || error.message}`)
+    }
   } finally {
     deletingId.value = null
   }
 }
+
 
 // Export records to CSV
 const exportCSV = () => {

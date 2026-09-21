@@ -154,6 +154,7 @@
 import axios from 'axios'
 import { ref } from 'vue'
 import { API_BASE_URL } from '../config'
+import { addLocalDummyRecord } from '../dummyData'
 
 const emit = defineEmits(['refresh'])
 
@@ -260,9 +261,25 @@ const submitForm = async () => {
     successMsg.value = "Record saved successfully to directory!"
     emit('refresh')
   } catch (error) {
-    console.error("Error saving data:", error)
-    const detail = error.response?.data?.detail || error.message || "Failed to save record."
-    errorMsg.value = `Error: ${detail}`
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    if (isLocalhost) {
+      addLocalDummyRecord({
+        name: name.value,
+        address: address.value,
+        contact: contact.value,
+        category: category.value,
+        email: email.value,
+        notes: notes.value,
+        image: imagePreview.value
+      })
+      resetForm()
+      successMsg.value = "Record saved locally (Demo mode)!"
+      emit('refresh')
+    } else {
+      console.error("Error saving data:", error)
+      const detail = error.response?.data?.detail || error.message || "Failed to save record."
+      errorMsg.value = `Error: ${detail}`
+    }
   } finally {
     isSubmitting.value = false
   }
