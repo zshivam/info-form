@@ -12,6 +12,8 @@ from pymongo import MongoClient
 load_dotenv()
 
 app = FastAPI(title="Info Form API (Vercel Serverless)")
+handler = app
+
 
 # Enable CORS for frontend on Vercel and localhost
 app.add_middleware(

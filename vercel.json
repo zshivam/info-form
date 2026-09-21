@@ -4,15 +4,15 @@
   "outputDirectory": "frontend/my-app/dist",
   "rewrites": [
     {
-      "source": "/api/:match*",
+      "source": "/api/(.*)",
       "destination": "/api/index.py"
     },
     {
-      "source": "/submit/:match*",
+      "source": "/submit(.*)",
       "destination": "/api/index.py"
     },
     {
-      "source": "/records/:match*",
+      "source": "/records(.*)",
       "destination": "/api/index.py"
     }
   ]
