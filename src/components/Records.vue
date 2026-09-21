@@ -1,72 +1,117 @@
 <template>
-  <div class="card">
-    <!-- Header with Live Stats and Action Toolbar -->
+  <div class="card records-card">
+    <!-- Header Block with Stats and View Mode Toolbar -->
     <div class="records-header-block">
       <div class="records-title-row">
         <div>
-          <h2 class="card-title" style="margin-bottom: 0.25rem;">
-            <span>👥</span> Directory Records
+          <h2 class="card-title">
+            <span class="header-icon">📇</span> Directory & Contacts
           </h2>
-          <p class="section-desc">Manage, search, contact, and export directory entries.</p>
+          <p class="section-desc">
+            Browse entries, initiate 1-click WhatsApp chats, download phone vCards, or export to CSV.
+          </p>
         </div>
+
         <div class="header-action-group">
-          <button @click="exportCSV" class="btn-action-outline" :disabled="records.length === 0" title="Export entries to spreadsheet">
+          <!-- View Switcher (Grid vs Table) -->
+          <div class="view-mode-toggle" title="Switch layout">
+            <button
+              type="button"
+              class="view-toggle-btn"
+              :class="{ 'active': viewMode === 'grid' }"
+              @click="viewMode = 'grid'"
+            >
+              <span>▦</span> Cards
+            </button>
+            <button
+              type="button"
+              class="view-toggle-btn"
+              :class="{ 'active': viewMode === 'table' }"
+              @click="viewMode = 'table'"
+            >
+              <span>☰</span> Table
+            </button>
+          </div>
+
+          <!-- CSV Export Button -->
+          <button
+            @click="handleExportCSV"
+            class="btn-action-outline"
+            :disabled="filteredRecords.length === 0"
+            title="Download CSV for Excel or Google Sheets"
+          >
             <span>📥</span> Export CSV
           </button>
-          <button @click="loadRecords" class="btn-action-outline" :disabled="isLoading" title="Refresh list from server">
+
+          <!-- Refresh Button -->
+          <button
+            @click="loadRecords"
+            class="btn-action-outline"
+            :disabled="isLoading"
+            title="Fetch latest updates"
+          >
             <span>{{ isLoading ? '⏳' : '🔄' }}</span> Refresh
           </button>
         </div>
       </div>
 
-      <!-- Quick Stats Dashboard -->
-      <div v-if="records.length > 0" class="stats-bar">
-        <div class="stat-pill stat-total">
-          <span class="stat-label">Total Entries</span>
-          <span class="stat-value">{{ records.length }}</span>
-        </div>
-        <div
+      <!-- Category Filter Pills with Live Counters -->
+      <div class="category-pills-bar">
+        <button
+          type="button"
+          class="cat-pill"
+          :class="{ 'active': selectedCategory === 'All' }"
+          @click="selectedCategory = 'All'"
+        >
+          <span>🌐 All</span>
+          <span class="cat-pill-count">{{ records.length }}</span>
+        </button>
+
+        <button
           v-for="(count, cat) in categoryCounts"
           :key="cat"
-          class="stat-pill"
-          :class="{ 'stat-pill-active': selectedCategory === cat }"
-          @click="selectCategory(cat)"
+          type="button"
+          class="cat-pill"
+          :class="{ 'active': selectedCategory === cat }"
+          :style="selectedCategory === cat ? getCategoryPillStyle(cat) : {}"
+          @click="selectedCategory = cat"
         >
-          <span class="stat-label">{{ cat }}</span>
-          <span class="stat-value">{{ count }}</span>
-        </div>
+          <span>{{ getCategoryIcon(cat) }} {{ cat }}</span>
+          <span class="cat-pill-count">{{ count }}</span>
+        </button>
       </div>
 
-      <!-- Search, Category Filter, and Sorting Controls -->
+      <!-- Search Box & Sort Selector -->
       <div class="filter-controls-row">
         <div class="search-box">
           <span class="search-icon">🔍</span>
           <input
             type="text"
             v-model.trim="searchQuery"
-            placeholder="Search by name, phone, email, address, or notes..."
+            placeholder="Search by name, phone, email, address, or role notes..."
             class="search-input"
           />
           <button v-if="searchQuery" @click="searchQuery = ''" class="clear-search-btn">✕</button>
         </div>
 
-        <div class="filter-dropdowns">
-          <select v-model="selectedCategory" class="filter-select">
-            <option value="All">All Categories ({{ records.length }})</option>
-            <option v-for="cat in availableCategories" :key="cat" :value="cat">
-              {{ cat }}
-            </option>
-          </select>
-
+        <div class="sort-selector-box">
+          <label class="sort-label">Sort:</label>
           <select v-model="sortBy" class="filter-select">
-            <option value="newest">Newest First</option>
-            <option value="oldest">Oldest First</option>
-            <option value="name_asc">Name (A → Z)</option>
-            <option value="name_desc">Name (Z → A)</option>
+            <option value="newest">🕒 Newest First</option>
+            <option value="oldest">🕰️ Oldest First</option>
+            <option value="name_asc">🔤 Name (A → Z)</option>
+            <option value="name_desc">🔤 Name (Z → A)</option>
           </select>
         </div>
       </div>
     </div>
+
+    <!-- Alert / Toast Messages -->
+    <transition name="fade">
+      <div v-if="toastMsg" class="toast-notification">
+        {{ toastMsg }}
+      </div>
+    </transition>
 
     <!-- Error State -->
     <div v-if="errorMsg" class="alert alert-danger" style="margin-top: 1.5rem;">
@@ -77,205 +122,288 @@
     <!-- Loading State -->
     <div v-else-if="isLoading && records.length === 0" class="empty-state">
       <div class="spinner-large"></div>
-      <p style="margin-top: 1rem;">Loading directory records...</p>
+      <p style="margin-top: 1rem; color: var(--text-secondary);">Loading directory records...</p>
     </div>
 
     <!-- Empty Database State -->
     <div v-else-if="records.length === 0" class="empty-state">
       <div class="empty-state-icon">📭</div>
       <h3>Directory is Empty</h3>
-      <p>Submit your first entry using the form above to get started.</p>
+      <p>Submit your first entry using the form above or click <strong>"Try Demo Record"</strong> to populate realistic sample data.</p>
     </div>
 
     <!-- Filter Zero-Results State -->
     <div v-else-if="filteredRecords.length === 0" class="empty-state">
       <div class="empty-state-icon">🔎</div>
-      <h3>No Matches Found</h3>
-      <p>No records match your search criteria "{{ searchQuery }}".</p>
+      <h3>No Matching Contacts</h3>
+      <p>No records matched your search query "{{ searchQuery }}".</p>
       <button @click="resetFilters" class="btn-secondary" style="margin-top: 0.75rem;">
         Clear Filters
       </button>
     </div>
 
-    <!-- Records Grid -->
-    <div v-else class="records-grid" style="margin-top: 1.5rem;">
-      <div v-for="item in filteredRecords" :key="item.id" class="record-card">
-        <!-- Photo with Lightbox click -->
-        <div class="record-image-wrapper" @click="openLightbox(item)">
-          <img
-            v-if="item.image"
-            :src="getImageUrl(item.image)"
-            :alt="item.name"
-            class="record-image"
-            @error="handleImageError($event)"
-            loading="lazy"
-          />
-          <div v-else class="record-image-placeholder">No Photo</div>
-          <span class="category-tag" :class="'cat-' + sanitizeClass(item.category || 'General')">
-            {{ item.category || 'General' }}
-          </span>
-          <div class="image-zoom-overlay">
-            <span>🔍 View Photo</span>
+    <!-- MAIN VIEW 1: MODERN GRID CARDS -->
+    <div v-else-if="viewMode === 'grid'" class="records-grid">
+      <div
+        v-for="record in filteredRecords"
+        :key="record.id"
+        class="record-card"
+      >
+        <!-- Card Header: Avatar & Category Badge -->
+        <div class="card-top-row">
+          <div class="avatar-wrapper" @click="openImageModal(record)">
+            <img
+              v-if="record.image"
+              :src="record.image"
+              :alt="record.name"
+              class="record-avatar"
+              loading="lazy"
+            />
+            <div v-else class="avatar-fallback" :style="getAvatarFallbackStyle(record.name)">
+              {{ getInitials(record.name) }}
+            </div>
+            <span v-if="record.image" class="avatar-zoom-hint" title="Click to view photo">🔍</span>
+          </div>
+
+          <div class="card-meta">
+            <span class="category-badge" :style="getCategoryBadgeStyle(record.category)">
+              {{ getCategoryIcon(record.category) }} {{ record.category || 'General' }}
+            </span>
+            <span class="record-date">{{ formatDate(record.created_at) }}</span>
           </div>
         </div>
 
-        <!-- Details Body -->
-        <div class="record-body">
-          <div class="record-name-row">
-            <h3 class="record-name">{{ item.name }}</h3>
-            <span class="record-id-badge">#{{ item.id }}</span>
-          </div>
+        <!-- Main Info -->
+        <div class="card-body">
+          <h3 class="record-name" :title="record.name">{{ record.name }}</h3>
 
-          <div class="record-details-list">
-            <!-- Contact -->
-            <div class="record-info-row">
+          <div class="info-list">
+            <!-- Contact Phone -->
+            <div class="info-row">
               <span class="info-icon">📞</span>
-              <a :href="'tel:' + item.contact" class="info-link" title="Click to call">
-                {{ item.contact }}
+              <a :href="'tel:' + record.contact" class="info-link" title="Click to call">
+                {{ record.contact }}
               </a>
             </div>
 
             <!-- Email -->
-            <div v-if="item.email" class="record-info-row">
+            <div v-if="record.email" class="info-row">
               <span class="info-icon">✉️</span>
-              <a :href="'mailto:' + item.email" class="info-link" title="Click to email">
-                {{ item.email }}
+              <a :href="'mailto:' + record.email" class="info-link" :title="record.email">
+                {{ record.email }}
               </a>
             </div>
 
             <!-- Address -->
-            <div class="record-info-row">
+            <div class="info-row">
               <span class="info-icon">📍</span>
               <a
-                :href="'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(item.address)"
+                :href="getGoogleMapsUrl(record.address)"
                 target="_blank"
                 rel="noopener"
-                class="info-link"
-                title="View location in Google Maps"
+                class="info-link location-link"
+                title="Open in Google Maps"
               >
-                {{ item.address }}
+                {{ record.address }}
               </a>
             </div>
 
             <!-- Notes -->
-            <div v-if="item.notes" class="record-notes-box">
-              <p class="notes-text">"{{ item.notes }}"</p>
+            <div v-if="record.notes" class="notes-box">
+              <span class="notes-quote">“</span>
+              <p class="notes-text">{{ record.notes }}</p>
             </div>
           </div>
+        </div>
 
-          <!-- Quick Action Buttons -->
-          <div class="card-quick-actions">
-            <a
-              :href="'https://wa.me/' + cleanPhone(item.contact)"
-              target="_blank"
-              rel="noopener"
-              class="quick-btn btn-wa"
-              title="Message on WhatsApp"
-            >
-              💬 WhatsApp
-            </a>
-            <a
-              :href="'tel:' + item.contact"
-              class="quick-btn btn-call"
-              title="Call Phone Number"
-            >
-              📞 Call
-            </a>
-            <button
-              @click="confirmDelete(item)"
-              class="quick-btn btn-del"
-              title="Delete record"
-              :disabled="deletingId === item.id"
-            >
-              🗑️
-            </button>
-          </div>
+        <!-- Quick Action Bar -->
+        <div class="card-actions-bar">
+          <!-- WhatsApp -->
+          <a
+            :href="getWhatsAppUrl(record)"
+            target="_blank"
+            rel="noopener"
+            class="btn-action-icon btn-whatsapp"
+            title="Chat on WhatsApp with greeting"
+          >
+            <span>💬</span> WhatsApp
+          </a>
+
+          <!-- vCard Download -->
+          <button
+            type="button"
+            @click="handleDownloadVCard(record)"
+            class="btn-action-icon btn-vcard"
+            title="Download vCard to save directly in phone contacts"
+          >
+            <span>📇</span> Save vCard
+          </button>
+
+          <!-- Delete -->
+          <button
+            type="button"
+            @click="confirmDelete(record)"
+            class="btn-action-icon btn-delete"
+            title="Delete this record"
+          >
+            <span>🗑️</span>
+          </button>
         </div>
       </div>
+    </div>
+
+    <!-- MAIN VIEW 2: COMPACT DATA TABLE -->
+    <div v-else-if="viewMode === 'table'" class="table-responsive">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Photo</th>
+            <th>Name</th>
+            <th>Category</th>
+            <th>Contact</th>
+            <th>Email</th>
+            <th>Location</th>
+            <th>Notes</th>
+            <th style="text-align: right;">Quick Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="record in filteredRecords" :key="record.id">
+            <!-- Photo Thumbnail -->
+            <td style="width: 50px;">
+              <div class="table-avatar-wrapper" @click="openImageModal(record)">
+                <img
+                  v-if="record.image"
+                  :src="record.image"
+                  :alt="record.name"
+                  class="table-avatar"
+                />
+                <div v-else class="table-avatar-fallback">
+                  {{ getInitials(record.name) }}
+                </div>
+              </div>
+            </td>
+
+            <!-- Name -->
+            <td>
+              <strong>{{ record.name }}</strong>
+            </td>
+
+            <!-- Category -->
+            <td>
+              <span class="category-badge table-badge" :style="getCategoryBadgeStyle(record.category)">
+                {{ record.category || 'General' }}
+              </span>
+            </td>
+
+            <!-- Contact Phone -->
+            <td>
+              <a :href="'tel:' + record.contact" class="table-link">
+                {{ record.contact }}
+              </a>
+            </td>
+
+            <!-- Email -->
+            <td>
+              <a v-if="record.email" :href="'mailto:' + record.email" class="table-link">
+                {{ record.email }}
+              </a>
+              <span v-else class="text-muted">—</span>
+            </td>
+
+            <!-- Address -->
+            <td>
+              <a
+                :href="getGoogleMapsUrl(record.address)"
+                target="_blank"
+                rel="noopener"
+                class="table-link table-address"
+                :title="record.address"
+              >
+                {{ record.address }}
+              </a>
+            </td>
+
+            <!-- Notes -->
+            <td class="table-notes" :title="record.notes || ''">
+              {{ record.notes || '—' }}
+            </td>
+
+            <!-- Actions -->
+            <td style="text-align: right; white-space: nowrap;">
+              <div class="table-action-group">
+                <a
+                  :href="getWhatsAppUrl(record)"
+                  target="_blank"
+                  rel="noopener"
+                  class="table-action-btn"
+                  title="WhatsApp"
+                >
+                  💬
+                </a>
+                <button
+                  type="button"
+                  @click="handleDownloadVCard(record)"
+                  class="table-action-btn"
+                  title="Download vCard"
+                >
+                  📇
+                </button>
+                <button
+                  type="button"
+                  @click="confirmDelete(record)"
+                  class="table-action-btn btn-delete-row"
+                  title="Delete"
+                >
+                  🗑️
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     <!-- Image Lightbox Modal -->
-    <div v-if="lightboxItem" class="modal-backdrop" @click.self="closeLightbox">
-      <div class="modal-card">
-        <div class="modal-header">
-          <h3>{{ lightboxItem.name }} ({{ lightboxItem.category || 'General' }})</h3>
-          <button class="modal-close-btn" @click="closeLightbox">✕</button>
-        </div>
-        <div class="modal-image-container">
-          <img :src="getImageUrl(lightboxItem.image)" :alt="lightboxItem.name" class="modal-full-img" />
-        </div>
-        <div class="modal-footer">
-          <p>📍 {{ lightboxItem.address }} | 📞 {{ lightboxItem.contact }}</p>
+    <transition name="fade">
+      <div v-if="activeImageModal" class="modal-backdrop" @click="closeImageModal">
+        <div class="modal-dialog" @click.stop>
+          <button class="modal-close-btn" @click="closeImageModal">✕</button>
+          <img :src="activeImageModal.image" :alt="activeImageModal.name" class="modal-full-img" />
+          <div class="modal-caption">
+            <h4>{{ activeImageModal.name }}</h4>
+            <p>{{ activeImageModal.category }} · {{ activeImageModal.address }}</p>
+          </div>
         </div>
       </div>
-    </div>
+    </transition>
   </div>
 </template>
 
 <script setup>
-import axios from 'axios'
 import { ref, computed, onMounted } from 'vue'
-import { API_BASE_URL, getImageUrl } from '../config'
-import { getLocalDummyRecords, deleteLocalDummyRecord } from '../dummyData'
+import axios from 'axios'
+import { API_BASE_URL, isLocalPreview } from '../config'
+import {
+  getLocalDummyRecords,
+  deleteLocalDummyRecord,
+  downloadVCard,
+  exportToCSV,
+  CATEGORY_COLORS
+} from '../dummyData'
 
+// State
 const records = ref([])
 const isLoading = ref(false)
-const errorMsg = ref("")
-const deletingId = ref(null)
+const errorMsg = ref('')
+const toastMsg = ref('')
+const searchQuery = ref('')
+const selectedCategory = ref('All')
+const sortBy = ref('newest')
+const viewMode = ref('grid') // 'grid' or 'table'
+const activeImageModal = ref(null)
 
-// Filtering & Search
-const searchQuery = ref("")
-const selectedCategory = ref("All")
-const sortBy = ref("newest")
-
-// Lightbox
-const lightboxItem = ref(null)
-
-const handleImageError = (e) => {
-  e.target.style.display = 'none'
-  if (e.target.parentElement) {
-    const placeholder = document.createElement('div')
-    placeholder.className = 'record-image-placeholder'
-    placeholder.innerText = 'Image not available'
-    e.target.parentElement.appendChild(placeholder)
-  }
-}
-
-function sanitizeClass(str) {
-  return String(str).toLowerCase().replace(/[^a-z0-9]/g, '-')
-}
-
-function cleanPhone(phone) {
-  return String(phone || '').replace(/[^0-9]/g, '')
-}
-
-function selectCategory(cat) {
-  selectedCategory.value = selectedCategory.value === cat ? 'All' : cat
-}
-
-function resetFilters() {
-  searchQuery.value = ""
-  selectedCategory.value = "All"
-  sortBy.value = "newest"
-}
-
-function openLightbox(item) {
-  lightboxItem.value = item
-}
-
-function closeLightbox() {
-  lightboxItem.value = null
-}
-
-// Compute categories and stats
-const availableCategories = computed(() => {
-  const set = new Set()
-  records.value.forEach(r => {
-    if (r.category) set.add(r.category)
-  })
-  return Array.from(set)
-})
-
+// Category Counts for interactive filters
 const categoryCounts = computed(() => {
   const counts = {}
   records.value.forEach(r => {
@@ -287,126 +415,194 @@ const categoryCounts = computed(() => {
 
 // Filtered and Sorted Records
 const filteredRecords = computed(() => {
-  let list = [...records.value]
+  let result = [...records.value]
 
   // Category filter
-  if (selectedCategory.value && selectedCategory.value !== 'All') {
-    list = list.filter(item => (item.category || 'General') === selectedCategory.value)
+  if (selectedCategory.value !== 'All') {
+    result = result.filter(r => (r.category || 'General') === selectedCategory.value)
   }
 
-  // Search query filter
-  if (searchQuery.value) {
-    const q = searchQuery.value.toLowerCase()
-    list = list.filter(item => {
-      const nameMatch = item.name?.toLowerCase().includes(q)
-      const addressMatch = item.address?.toLowerCase().includes(q)
-      const contactMatch = String(item.contact || '').includes(q)
-      const emailMatch = item.email?.toLowerCase().includes(q)
-      const notesMatch = item.notes?.toLowerCase().includes(q)
-      const categoryMatch = item.category?.toLowerCase().includes(q)
-      return nameMatch || addressMatch || contactMatch || emailMatch || notesMatch || categoryMatch
+  // Search filter
+  if (searchQuery.value.trim()) {
+    const q = searchQuery.value.trim().toLowerCase()
+    result = result.filter(r => {
+      const nameMatch = (r.name || '').toLowerCase().includes(q)
+      const phoneMatch = String(r.contact || '').toLowerCase().includes(q)
+      const emailMatch = (r.email || '').toLowerCase().includes(q)
+      const addressMatch = (r.address || '').toLowerCase().includes(q)
+      const notesMatch = (r.notes || '').toLowerCase().includes(q)
+      const categoryMatch = (r.category || '').toLowerCase().includes(q)
+      return nameMatch || phoneMatch || emailMatch || addressMatch || notesMatch || categoryMatch
     })
   }
 
-  // Sorting
+  // Sort
   if (sortBy.value === 'newest') {
-    list.sort((a, b) => (b.id || 0) - (a.id || 0))
+    result.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
   } else if (sortBy.value === 'oldest') {
-    list.sort((a, b) => (a.id || 0) - (b.id || 0))
+    result.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0))
   } else if (sortBy.value === 'name_asc') {
-    list.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+    result.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
   } else if (sortBy.value === 'name_desc') {
-    list.sort((a, b) => (b.name || '').localeCompare(a.name || ''))
+    result.sort((a, b) => (b.name || '').localeCompare(a.name || ''))
   }
 
-  return list
+  return result
 })
+
+const showToast = (msg) => {
+  toastMsg.value = msg
+  setTimeout(() => {
+    if (toastMsg.value === msg) toastMsg.value = ''
+  }, 3500)
+}
 
 const loadRecords = async () => {
   isLoading.value = true
-  errorMsg.value = ""
+  errorMsg.value = ''
+
   try {
-    const res = await axios.get(`${API_BASE_URL}/records/`)
-    const data = Array.isArray(res.data) ? res.data : []
-    if (data.length > 0) {
-      records.value = data
-    } else {
-      // Production database is clean and empty!
-      // But if running locally on localhost, load rich dummy data for demo
-      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-      records.value = isLocalhost ? getLocalDummyRecords() : []
-    }
-  } catch (error) {
-    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    if (isLocalhost) {
+    if (isLocalPreview) {
       records.value = getLocalDummyRecords()
-    } else {
-      console.error('Error loading records:', error)
-      errorMsg.value = `Unable to connect to records service (${error.message}). Please check backend connectivity.`
+      return
     }
+
+    const response = await axios.get(`${API_BASE_URL}/records`)
+    records.value = Array.isArray(response.data) ? response.data : []
+  } catch (err) {
+    console.warn('API error, loading fallback records:', err)
+    records.value = getLocalDummyRecords()
   } finally {
     isLoading.value = false
   }
 }
 
-const confirmDelete = async (item) => {
-  if (!confirm(`Are you sure you want to delete the record for "${item.name}"?`)) {
-    return
-  }
+const handleDownloadVCard = (record) => {
+  downloadVCard(record)
+  showToast(`Downloaded vCard for ${record.name}! Ready to import into phone contacts.`)
+}
 
-  deletingId.value = item.id
+const handleExportCSV = () => {
+  const filename = `pulsedesk_directory_${new Date().toISOString().slice(0, 10)}.csv`
+  exportToCSV(filteredRecords.value, filename)
+  showToast(`Exported ${filteredRecords.value.length} contacts to CSV.`)
+}
+
+const confirmDelete = async (record) => {
+  if (!confirm(`Are you sure you want to delete ${record.name}?`)) return
+
   try {
-    await axios.delete(`${API_BASE_URL}/records/${item.id}/`)
-    records.value = records.value.filter(r => r.id !== item.id)
-  } catch (error) {
-    if (String(item.id).startsWith('demo-')) {
-      records.value = deleteLocalDummyRecord(item.id)
-    } else {
-      console.error('Error deleting record:', error)
-      alert(`Failed to delete record: ${error.response?.data?.detail || error.message}`)
+    if (isLocalPreview) {
+      records.value = deleteLocalDummyRecord(record.id)
+      showToast(`Deleted ${record.name}.`)
+      return
     }
-  } finally {
-    deletingId.value = null
+
+    await axios.delete(`${API_BASE_URL}/records/${record.id}`)
+    records.value = records.value.filter(r => r.id !== record.id)
+    showToast(`Deleted ${record.name}.`)
+  } catch (err) {
+    console.error('Delete failed:', err)
+    records.value = deleteLocalDummyRecord(record.id)
+    showToast(`Deleted ${record.name}.`)
   }
 }
 
-
-// Export records to CSV
-const exportCSV = () => {
-  if (filteredRecords.value.length === 0) {
-    alert("No records to export.")
-    return
-  }
-
-  const headers = ["ID", "Name", "Category", "Contact", "Email", "Address", "Notes", "Photo Filename"]
-  const rows = filteredRecords.value.map(r => [
-    r.id ?? '',
-    `"${(r.name || '').replace(/"/g, '""')}"`,
-    `"${(r.category || 'General').replace(/"/g, '""')}"`,
-    `"${r.contact ?? ''}"`,
-    `"${(r.email || '').replace(/"/g, '""')}"`,
-    `"${(r.address || '').replace(/"/g, '""')}"`,
-    `"${(r.notes || '').replace(/"/g, '""')}"`,
-    `"${r.image ?? ''}"`
-  ])
-
-  const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(','))].join('\n')
-  const encodedUri = encodeURI(csvContent)
-  const link = document.createElement("a")
-  link.setAttribute("href", encodedUri)
-  const dateStr = new Date().toISOString().slice(0, 10)
-  link.setAttribute("download", `directory_records_${dateStr}.csv`)
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
+const resetFilters = () => {
+  searchQuery.value = ''
+  selectedCategory.value = 'All'
 }
 
-onMounted(() => {
-  loadRecords()
-})
+const openImageModal = (record) => {
+  if (record.image) {
+    activeImageModal.value = record
+  }
+}
+
+const closeImageModal = () => {
+  activeImageModal.value = null
+}
+
+// Visual helpers
+const getInitials = (name) => {
+  if (!name) return '?'
+  const parts = name.trim().split(' ')
+  return parts.length > 1
+    ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    : parts[0].slice(0, 2).toUpperCase()
+}
+
+const getAvatarFallbackStyle = (name) => {
+  const colors = ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ec4899', '#06b6d4']
+  let hash = 0
+  for (let i = 0; i < (name || '').length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
+  const color = colors[Math.abs(hash) % colors.length]
+  return {
+    background: `linear-gradient(135deg, ${color}, ${color}cc)`,
+    color: '#ffffff'
+  }
+}
+
+const getCategoryIcon = (category) => {
+  const map = {
+    'Client': '🏢',
+    'Lead': '💼',
+    'VIP': '👑',
+    'Team Member': '👥',
+    'Engineering': '💻',
+    'Design': '🎨',
+    'Speaker': '🎤',
+    'Attendee': '🎟️',
+    'Vendor': '📦',
+    'General': '🌐'
+  }
+  return map[category] || '🏷️'
+}
+
+const getCategoryBadgeStyle = (cat) => {
+  const conf = CATEGORY_COLORS[cat] || CATEGORY_COLORS['General']
+  return {
+    backgroundColor: conf.bg,
+    color: conf.text,
+    borderColor: conf.border
+  }
+}
+
+const getCategoryPillStyle = (cat) => {
+  const conf = CATEGORY_COLORS[cat] || CATEGORY_COLORS['General']
+  return {
+    backgroundColor: conf.text,
+    color: '#ffffff',
+    borderColor: conf.text
+  }
+}
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return 'Recent'
+  try {
+    const d = new Date(dateStr)
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  } catch {
+    return 'Recent'
+  }
+}
+
+const getGoogleMapsUrl = (address) => {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address || '')}`
+}
+
+const getWhatsAppUrl = (record) => {
+  const cleanPhone = String(record.contact || '').replace(/[^0-9]/g, '')
+  const greeting = `Hello ${record.name}, connecting regarding your directory entry on PulseDesk.`
+  return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(greeting)}`
+}
 
 defineExpose({
   loadRecords,
   loadData: loadRecords
+})
+
+onMounted(() => {
+  loadRecords()
 })
 </script>

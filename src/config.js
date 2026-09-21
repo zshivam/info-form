@@ -1,7 +1,14 @@
-// Unified API configuration
-// Points to your live Vercel backend deployment: https://api-zghu.vercel.app
+// Unified API configuration for PulseDesk Directory Hub
+
+export const isLocalPreview = typeof window !== 'undefined' && (
+  window.location.hostname === 'localhost' || 
+  window.location.hostname === '127.0.0.1' ||
+  window.location.hostname.includes('192.168.')
+);
+
+// On production Vercel deployment, same-origin relative URLs (/api, /submit, /records) avoid all CORS issues
 export const API_BASE_URL = (
-  import.meta.env.VITE_API_URL || 'https://api-zghu.vercel.app'
+  import.meta.env.VITE_API_URL || (typeof window !== 'undefined' && !isLocalPreview ? '' : '')
 ).replace(/\/+$/, '');
 
 /**
