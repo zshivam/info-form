@@ -53,9 +53,12 @@ def init_mongo():
 
     try:
         if _db is None and not _use_memory:
-            safe_uri = MONGODB_URI.split("@")[-1] if "@" in MONGODB_URI else MONGODB_URI
-            print(f"Connecting to MongoDB: {safe_uri}")
-            _client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=4000)
+            _client = MongoClient(
+                MONGODB_URI,
+                serverSelectionTimeoutMS=2000,
+                connectTimeoutMS=2000,
+                socketTimeoutMS=2000
+            )
             _client.admin.command('ping')
             _db = _client[DB_NAME]
             print("Successfully connected to MongoDB!")
