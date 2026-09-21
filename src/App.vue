@@ -4,32 +4,27 @@
     <header class="app-header">
       <div class="header-main-row">
         <div class="brand-block">
-          <div class="brand-logo-icon">📇</div>
+          <div class="brand-logo-icon">📋</div>
           <div>
             <h1 class="brand-title">PulseDesk</h1>
-            <p class="brand-tagline">Universal Directory & Contact Management Hub</p>
+            <p class="brand-tagline">Professional Directory & Form Management System</p>
           </div>
         </div>
 
-        <!-- Live Status & Purpose Tags -->
+        <!-- Live Status & Mode Badges -->
         <div class="header-badges-row">
           <span class="status-indicator-badge">
-            <span class="pulse-dot"></span> Ready & Syncing
+            <span class="pulse-dot"></span> System Online
           </span>
-          <button 
-            type="button" 
-            @click="isMascotVisible = !isMascotVisible" 
-            class="mascot-toggle-btn"
-            :title="isMascotVisible ? 'Minimize 3D Mascot' : 'Show 3D Companion Mascot'"
-          >
-            <span>{{ isMascotVisible ? '🤖 Hide Mascot' : '✨ Show 3D Mascot' }}</span>
-          </button>
+          <span class="system-mode-badge">
+            <span>🛡️</span> Verified Production
+          </span>
         </div>
       </div>
 
       <!-- Quick Purpose Presets Switcher -->
       <div class="presets-banner">
-        <span class="presets-intro">🎯 Purpose Presets:</span>
+        <span class="presets-intro">Select Preset:</span>
         <div class="preset-buttons-group">
           <button
             v-for="preset in DIRECTORY_PRESETS"
@@ -46,13 +41,6 @@
       </div>
     </header>
 
-    <!-- 3D Cute Interactive Companion Mascot Stage (Collapsible) -->
-    <transition name="slide-fade">
-      <div v-show="isMascotVisible" class="mascot-section-wrapper">
-        <CuteCompanion3D ref="mascotRef" />
-      </div>
-    </transition>
-
     <!-- Main Content Workspace -->
     <main class="main-workspace">
       <Form ref="formComponent" @refresh="onFormSubmitted" />
@@ -61,8 +49,8 @@
 
     <!-- Footer -->
     <footer class="app-footer">
-      <p>PulseDesk · Multi-purpose Contact & Directory Management Hub</p>
-      <p class="footer-sub">FastAPI Serverless & MongoDB Backend · Vue 3 & Three.js Single Page App</p>
+      <p><strong>PulseDesk</strong> · Professional Contact & Directory Management System</p>
+      <p class="footer-sub">Secure Enterprise Form Submission & Record Storage</p>
     </footer>
   </div>
 </template>
@@ -71,13 +59,10 @@
 import { ref } from 'vue'
 import Form from './components/Forms.vue'
 import Records from './components/Records.vue'
-import CuteCompanion3D from './components/CuteCompanion3D.vue'
 import { DIRECTORY_PRESETS } from './dummyData'
 
 const recordsComponent = ref(null)
 const formComponent = ref(null)
-const mascotRef = ref(null)
-const isMascotVisible = ref(true)
 const activePresetId = ref('crm')
 
 const selectPreset = (preset) => {
@@ -91,9 +76,6 @@ const selectPreset = (preset) => {
 }
 
 const onFormSubmitted = () => {
-  // Trigger 3D mascot celebration dance + confetti
-  mascotRef.value?.celebrateSubmission?.()
-
   // Refresh records table
   if (recordsComponent.value?.loadRecords) {
     recordsComponent.value.loadRecords()
