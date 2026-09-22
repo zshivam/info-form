@@ -1,0 +1,14 @@
+<svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="36" height="36" rx="9" fill="url(#inFOrmFaviconGrad)" />
+  <!-- Info Dot & Stem ('i') -->
+  <circle cx="11.5" cy="11" r="2.2" fill="#ffffff" />
+  <path d="M11.5 16.5V25" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" />
+  <!-- Form Checklist Lines ('form') -->
+  <path d="M17.5 12H25M17.5 17.5H25M17.5 23H22" stroke="#bfdbfe" stroke-width="2.2" stroke-linecap="round" />
+  <defs>
+    <linearGradient id="inFOrmFaviconGrad" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2563eb" />
+      <stop offset="1" stop-color="#1d4ed8" />
+    </linearGradient>
+  </defs>
+</svg>
