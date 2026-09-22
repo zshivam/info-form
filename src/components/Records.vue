@@ -8,7 +8,7 @@
             <span class="header-icon">📇</span> Directory & Contacts
           </h2>
           <p class="section-desc">
-            Browse entries, initiate 1-click WhatsApp chats, download phone vCards, or export to CSV.
+            Browse, search, export, or contact entries directly.
           </p>
         </div>
 
@@ -88,7 +88,7 @@
           <input
             type="text"
             v-model.trim="searchQuery"
-            placeholder="Search by name, phone, email, address, or role notes..."
+            placeholder="Search by name, phone, email, address, or notes..."
             class="search-input"
           />
           <button v-if="searchQuery" @click="searchQuery = ''" class="clear-search-btn">✕</button>
@@ -97,8 +97,8 @@
         <div class="sort-selector-box">
           <label class="sort-label">Sort:</label>
           <select v-model="sortBy" class="filter-select">
-            <option value="newest">🕒 Newest First</option>
-            <option value="oldest">🕰️ Oldest First</option>
+            <option value="newest">🕒 Newest</option>
+            <option value="oldest">🕰️ Oldest</option>
             <option value="name_asc">🔤 Name (A → Z)</option>
             <option value="name_desc">🔤 Name (Z → A)</option>
           </select>
@@ -142,109 +142,103 @@
       </button>
     </div>
 
-    <!-- MAIN VIEW 1: MODERN GRID CARDS -->
-    <div v-else-if="viewMode === 'grid'" class="records-grid">
+    <!-- ============================================== -->
+    <!-- MAIN VIEW 1: STREAMLINED COMPACT GRID CARDS   -->
+    <!-- ============================================== -->
+    <div v-else-if="viewMode === 'grid'" class="records-grid-compact">
       <div
         v-for="record in filteredRecords"
         :key="record.id"
-        class="record-card"
+        class="record-card-compact"
       >
-        <!-- Card Header: Avatar & Category Badge -->
-        <div class="card-top-row">
-          <div class="avatar-wrapper" @click="openImageModal(record)">
+        <!-- Card Top: Compact Avatar + Identity + Category -->
+        <div class="card-compact-header">
+          <div class="avatar-compact-wrapper" @click="openImageModal(record)">
             <img
               v-if="record.image"
               :src="record.image"
               :alt="record.name"
-              class="record-avatar"
+              class="record-compact-avatar"
               loading="lazy"
             />
-            <div v-else class="avatar-fallback" :style="getAvatarFallbackStyle(record.name)">
+            <div v-else class="avatar-compact-fallback" :style="getAvatarFallbackStyle(record.name)">
               {{ getInitials(record.name) }}
             </div>
-            <span v-if="record.image" class="avatar-zoom-hint" title="Click to view photo">🔍</span>
           </div>
 
-          <div class="card-meta">
-            <span class="category-badge" :style="getCategoryBadgeStyle(record.category)">
+          <div class="card-compact-identity">
+            <h4 class="card-compact-name" :title="record.name">{{ record.name }}</h4>
+            <span class="category-badge-compact" :style="getCategoryBadgeStyle(record.category)">
               {{ getCategoryIcon(record.category) }} {{ record.category || 'General' }}
             </span>
-            <span class="record-date">{{ formatDate(record.created_at) }}</span>
           </div>
         </div>
 
-        <!-- Main Info -->
-        <div class="card-body">
-          <h3 class="record-name" :title="record.name">{{ record.name }}</h3>
+        <!-- Card Body: Contact Info in clean compact rows -->
+        <div class="card-compact-body">
+          <!-- Phone & WhatsApp shortcut -->
+          <div class="compact-info-row">
+            <span class="compact-icon">📞</span>
+            <a :href="'tel:' + record.contact" class="compact-link" title="Call">
+              {{ record.contact }}
+            </a>
+          </div>
 
-          <div class="info-list">
-            <!-- Contact Phone -->
-            <div class="info-row">
-              <span class="info-icon">📞</span>
-              <a :href="'tel:' + record.contact" class="info-link" title="Click to call">
-                {{ record.contact }}
-              </a>
-            </div>
+          <!-- Email (if present) -->
+          <div v-if="record.email" class="compact-info-row">
+            <span class="compact-icon">✉️</span>
+            <a :href="'mailto:' + record.email" class="compact-link text-truncate" :title="record.email">
+              {{ record.email }}
+            </a>
+          </div>
 
-            <!-- Email -->
-            <div v-if="record.email" class="info-row">
-              <span class="info-icon">✉️</span>
-              <a :href="'mailto:' + record.email" class="info-link" :title="record.email">
-                {{ record.email }}
-              </a>
-            </div>
+          <!-- Address -->
+          <div class="compact-info-row">
+            <span class="compact-icon">📍</span>
+            <a
+              :href="getGoogleMapsUrl(record.address)"
+              target="_blank"
+              rel="noopener"
+              class="compact-link text-truncate"
+              :title="record.address"
+            >
+              {{ record.address }}
+            </a>
+          </div>
 
-            <!-- Address -->
-            <div class="info-row">
-              <span class="info-icon">📍</span>
-              <a
-                :href="getGoogleMapsUrl(record.address)"
-                target="_blank"
-                rel="noopener"
-                class="info-link location-link"
-                title="Open in Google Maps"
-              >
-                {{ record.address }}
-              </a>
-            </div>
-
-            <!-- Notes -->
-            <div v-if="record.notes" class="notes-box">
-              <span class="notes-quote">“</span>
-              <p class="notes-text">{{ record.notes }}</p>
-            </div>
+          <!-- Notes snippet (if present) -->
+          <div v-if="record.notes" class="compact-notes" :title="record.notes">
+            <span class="compact-notes-icon">📝</span>
+            <span class="compact-notes-text">{{ record.notes }}</span>
           </div>
         </div>
 
-        <!-- Quick Action Bar -->
-        <div class="card-actions-bar">
-          <!-- WhatsApp -->
+        <!-- Card Footer: Quick Actions Bar -->
+        <div class="card-compact-footer">
           <a
             :href="getWhatsAppUrl(record)"
             target="_blank"
             rel="noopener"
-            class="btn-action-icon btn-whatsapp"
-            title="Chat on WhatsApp with greeting"
+            class="compact-action-btn btn-wa-compact"
+            title="Chat on WhatsApp"
           >
             <span>💬</span> WhatsApp
           </a>
 
-          <!-- vCard Download -->
           <button
             type="button"
             @click="handleDownloadVCard(record)"
-            class="btn-action-icon btn-vcard"
-            title="Download vCard to save directly in phone contacts"
+            class="compact-action-btn btn-vcard-compact"
+            title="Download vCard (.vcf) contact"
           >
-            <span>📇</span> Save vCard
+            <span>📇</span> vCard
           </button>
 
-          <!-- Delete -->
           <button
             type="button"
             @click="confirmDelete(record)"
-            class="btn-action-icon btn-delete"
-            title="Delete this record"
+            class="compact-action-btn btn-del-compact"
+            title="Delete record"
           >
             <span>🗑️</span>
           </button>
@@ -252,108 +246,107 @@
       </div>
     </div>
 
-    <!-- MAIN VIEW 2: COMPACT DATA TABLE -->
-    <div v-else-if="viewMode === 'table'" class="table-responsive">
-      <table class="data-table">
+    <!-- ============================================== -->
+    <!-- MAIN VIEW 2: HIGHLY ORGANIZED DATA TABLE       -->
+    <!-- ============================================== -->
+    <div v-else-if="viewMode === 'table'" class="table-container-organized">
+      <table class="organized-table">
         <thead>
           <tr>
-            <th>Photo</th>
-            <th>Name</th>
-            <th>Category</th>
-            <th>Contact</th>
-            <th>Email</th>
-            <th>Location</th>
-            <th>Notes</th>
-            <th style="text-align: right;">Quick Actions</th>
+            <th class="col-contact">Contact & Details</th>
+            <th class="col-category">Category</th>
+            <th class="col-phone">Phone / WhatsApp</th>
+            <th class="col-location">Location</th>
+            <th class="col-notes">Notes</th>
+            <th class="col-actions">Actions</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="record in filteredRecords" :key="record.id">
-            <!-- Photo Thumbnail -->
-            <td style="width: 50px;">
-              <div class="table-avatar-wrapper" @click="openImageModal(record)">
-                <img
-                  v-if="record.image"
-                  :src="record.image"
-                  :alt="record.name"
-                  class="table-avatar"
-                />
-                <div v-else class="table-avatar-fallback">
-                  {{ getInitials(record.name) }}
+          <tr v-for="record in filteredRecords" :key="record.id" class="organized-row">
+            <!-- 1. Contact (Avatar + Name + Email Cohesive Unit) -->
+            <td class="cell-contact">
+              <div class="contact-identity-block">
+                <div class="table-mini-avatar" @click="openImageModal(record)">
+                  <img
+                    v-if="record.image"
+                    :src="record.image"
+                    :alt="record.name"
+                    class="mini-avatar-img"
+                  />
+                  <div v-else class="mini-avatar-fallback">
+                    {{ getInitials(record.name) }}
+                  </div>
+                </div>
+                <div class="contact-names-stack">
+                  <span class="table-contact-name">{{ record.name }}</span>
+                  <span v-if="record.email" class="table-contact-email">{{ record.email }}</span>
+                  <span v-else class="table-contact-no-email">No email</span>
                 </div>
               </div>
             </td>
 
-            <!-- Name -->
-            <td>
-              <strong>{{ record.name }}</strong>
-            </td>
-
-            <!-- Category -->
-            <td>
-              <span class="category-badge table-badge" :style="getCategoryBadgeStyle(record.category)">
-                {{ record.category || 'General' }}
+            <!-- 2. Category Pill -->
+            <td class="cell-category">
+              <span class="category-badge-compact" :style="getCategoryBadgeStyle(record.category)">
+                {{ getCategoryIcon(record.category) }} {{ record.category || 'General' }}
               </span>
             </td>
 
-            <!-- Contact Phone -->
-            <td>
-              <a :href="'tel:' + record.contact" class="table-link">
-                {{ record.contact }}
-              </a>
-            </td>
-
-            <!-- Email -->
-            <td>
-              <a v-if="record.email" :href="'mailto:' + record.email" class="table-link">
-                {{ record.email }}
-              </a>
-              <span v-else class="text-muted">—</span>
-            </td>
-
-            <!-- Address -->
-            <td>
-              <a
-                :href="getGoogleMapsUrl(record.address)"
-                target="_blank"
-                rel="noopener"
-                class="table-link table-address"
-                :title="record.address"
-              >
-                {{ record.address }}
-              </a>
-            </td>
-
-            <!-- Notes -->
-            <td class="table-notes" :title="record.notes || ''">
-              {{ record.notes || '—' }}
-            </td>
-
-            <!-- Actions -->
-            <td style="text-align: right; white-space: nowrap;">
-              <div class="table-action-group">
+            <!-- 3. Phone & 1-Click WhatsApp Shortcut -->
+            <td class="cell-phone">
+              <div class="phone-action-inline">
+                <a :href="'tel:' + record.contact" class="phone-link">
+                  {{ record.contact }}
+                </a>
                 <a
                   :href="getWhatsAppUrl(record)"
                   target="_blank"
                   rel="noopener"
-                  class="table-action-btn"
+                  class="table-wa-chip"
                   title="WhatsApp"
                 >
                   💬
                 </a>
+              </div>
+            </td>
+
+            <!-- 4. Location -->
+            <td class="cell-location">
+              <a
+                :href="getGoogleMapsUrl(record.address)"
+                target="_blank"
+                rel="noopener"
+                class="location-text-link"
+                :title="record.address"
+              >
+                📍 {{ record.address }}
+              </a>
+            </td>
+
+            <!-- 5. Notes -->
+            <td class="cell-notes">
+              <span v-if="record.notes" class="notes-truncate" :title="record.notes">
+                {{ record.notes }}
+              </span>
+              <span v-else class="text-muted">—</span>
+            </td>
+
+            <!-- 6. Actions (vCard & Delete) -->
+            <td class="cell-actions">
+              <div class="table-actions-inline">
                 <button
                   type="button"
                   @click="handleDownloadVCard(record)"
-                  class="table-action-btn"
-                  title="Download vCard"
+                  class="tbl-btn tbl-btn-vcard"
+                  title="Download vCard (.vcf)"
                 >
                   📇
                 </button>
                 <button
                   type="button"
                   @click="confirmDelete(record)"
-                  class="table-action-btn btn-delete-row"
-                  title="Delete"
+                  class="tbl-btn tbl-btn-delete"
+                  title="Delete record"
                 >
                   🗑️
                 </button>
@@ -538,7 +531,7 @@ const getAvatarFallbackStyle = (name) => {
   for (let i = 0; i < (name || '').length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
   const color = colors[Math.abs(hash) % colors.length]
   return {
-    background: `linear-gradient(135deg, ${color}, ${color}cc)`,
+    backgroundColor: color,
     color: '#ffffff'
   }
 }
@@ -574,16 +567,6 @@ const getCategoryPillStyle = (cat) => {
     backgroundColor: conf.text,
     color: '#ffffff',
     borderColor: conf.text
-  }
-}
-
-const formatDate = (dateStr) => {
-  if (!dateStr) return 'Recent'
-  try {
-    const d = new Date(dateStr)
-    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-  } catch {
-    return 'Recent'
   }
 }
 
