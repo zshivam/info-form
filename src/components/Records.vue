@@ -483,7 +483,7 @@ const handleDownloadVCard = (record) => {
 }
 
 const handleExportCSV = () => {
-  const filename = `pulsedesk_directory_${new Date().toISOString().slice(0, 10)}.csv`
+  const filename = `inform_directory_${new Date().toISOString().slice(0, 10)}.csv`
   exportToCSV(filteredRecords.value, filename)
   showToast(`Exported ${filteredRecords.value.length} contacts to CSV.`)
 }
@@ -593,7 +593,7 @@ const getGoogleMapsUrl = (address) => {
 
 const getWhatsAppUrl = (record) => {
   const cleanPhone = String(record.contact || '').replace(/[^0-9]/g, '')
-  const greeting = `Hello ${record.name}, connecting regarding your directory entry on PulseDesk.`
+  const greeting = `Hello ${record.name}, connecting regarding your directory entry on inFOrm.`
   return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(greeting)}`
 }
 
