@@ -129,7 +129,7 @@
     <div v-else-if="records.length === 0" class="empty-state">
       <div class="empty-state-icon">📭</div>
       <h3>Directory is Empty</h3>
-      <p>Submit your first entry using the form above or click <strong>"Try Demo Record"</strong> to populate realistic sample data.</p>
+      <p>Submit your first entry using the form above to add your data.</p>
     </div>
 
     <!-- Filter Zero-Results State -->

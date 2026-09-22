@@ -10,16 +10,6 @@
           Capture client leads, team members, event guests, or vendor details with instant photo sync.
         </p>
       </div>
-      <div class="header-tools">
-        <button 
-          type="button" 
-          @click="fillDemoRecord" 
-          class="btn-demo-autofill"
-          title="Autofill realistic sample data to test the form immediately"
-        >
-          <span>✨</span> Try Demo Record
-        </button>
-      </div>
     </div>
 
     <!-- Alert Notifications -->
@@ -292,60 +282,6 @@ const clearImage = () => {
   imageFile.value = null
   imagePreview.value = ''
   if (fileInputRef.value) fileInputRef.value.value = ''
-}
-
-// Autofill realistic sample data for instant testing
-const fillDemoRecord = () => {
-  const samples = [
-    {
-      name: "Sophia Chen",
-      address: "72 Park Row, Suite 400, New York, NY",
-      contact: "9123456780",
-      email: "sophia.chen@vanguard.co",
-      category: "Client",
-      notes: "Enterprise Partner · Key Account Director · Contract renewal Q4",
-      preview: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=400&auto=format&fit=crop&q=80"
-    },
-    {
-      name: "Alex Rivera",
-      address: "404 Silicon Ave, San Francisco, CA",
-      contact: "9876543210",
-      email: "alex.rivera@techflow.io",
-      category: "Team Member",
-      notes: "Lead Full-Stack Architect & 3D Interactive Graphics Engineer",
-      preview: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80"
-    },
-    {
-      name: "Marcus Vance",
-      address: "15 King Street, Austin, TX",
-      contact: "9012345678",
-      email: "marcus.vance@apexlogistics.com",
-      category: "Vendor",
-      notes: "Logistics Coordinator & Specialized Fleet Logistics",
-      preview: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80"
-    },
-    {
-      name: "Dr. Jordan Blake",
-      address: "88 University Ave, Cambridge, MA",
-      contact: "9456781230",
-      email: "j.blake@mit.edu",
-      category: "VIP",
-      notes: "Advisory Board Member · AI & High Performance Systems",
-      preview: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&auto=format&fit=crop&q=80"
-    }
-  ]
-
-  const randomSample = samples[Math.floor(Math.random() * samples.length)]
-  name.value = randomSample.name
-  address.value = randomSample.address
-  contact.value = randomSample.contact
-  email.value = randomSample.email
-  category.value = randomSample.category
-  notes.value = randomSample.notes
-  imagePreview.value = randomSample.preview
-  imageFile.value = null
-  successMsg.value = `Filled sample record for ${randomSample.name}! Click 'Submit' to save it.`
-  setTimeout(() => { successMsg.value = '' }, 4000)
 }
 
 const resetForm = () => {

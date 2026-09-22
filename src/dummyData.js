@@ -188,18 +188,8 @@ export function getLocalDummyRecords() {
   } catch (e) {
     console.warn("Could not read localStorage:", e)
   }
-  // Return default seed records from all presets
-  const initial = []
-  DIRECTORY_PRESETS.forEach(preset => {
-    preset.sampleRecords.forEach((rec, idx) => {
-      initial.push({
-        id: `demo-${preset.id}-${idx + 1}`,
-        ...rec,
-        created_at: new Date(Date.now() - (idx + 1) * 86400000).toISOString()
-      })
-    })
-  })
-  return initial
+  // Return clean empty array - no dummy seed records
+  return []
 }
 
 export function saveLocalDummyRecords(records) {
