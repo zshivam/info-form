@@ -220,32 +220,35 @@
 import { ref } from 'vue'
 import axios from 'axios'
 import { API_BASE_URL, isLocalPreview } from '../config'
-import { addLocalDummyRecord, DIRECTORY_PRESETS } from '../dummyData'
+import { addLocalDummyRecord } from '../dummyData'
 
 const emit = defineEmits(['refresh'])
 
-// Form fields
+// 1. Form Field State (arranged in order of form layout)
 const name = ref('')
-const address = ref('')
+const category = ref('Client')
 const contact = ref('')
 const email = ref('')
-const category = ref('Client')
+const address = ref('')
 const notes = ref('')
+
+// 2. Photo Upload State
 const imageFile = ref(null)
 const imagePreview = ref('')
 const isDragging = ref(false)
 const fileInputRef = ref(null)
 
-// UI status
+// 3. UI Status State
 const isSubmitting = ref(false)
 const successMsg = ref('')
 const errorMsg = ref('')
 
+// File Input Trigger
 const triggerFileInput = () => {
   fileInputRef.value?.click()
 }
 
-// Process selected file
+// Process Selected File
 const processImageFile = (file) => {
   if (!file) return
   if (!file.type.startsWith('image/')) {
@@ -286,10 +289,10 @@ const clearImage = () => {
 
 const resetForm = () => {
   name.value = ''
-  address.value = ''
+  category.value = 'Client'
   contact.value = ''
   email.value = ''
-  category.value = 'Client'
+  address.value = ''
   notes.value = ''
   clearImage()
   errorMsg.value = ''
@@ -307,18 +310,20 @@ const submitForm = async () => {
 
   isSubmitting.value = true
 
+  const recordPayload = {
+    name: name.value,
+    category: category.value,
+    contact: contact.value,
+    email: email.value || null,
+    address: address.value,
+    notes: notes.value || null,
+    image: imagePreview.value || ''
+  }
+
   try {
     // If on localhost without live backend, store locally
     if (isLocalPreview) {
-      addLocalDummyRecord({
-        name: name.value,
-        address: address.value,
-        contact: contact.value,
-        email: email.value || null,
-        category: category.value,
-        notes: notes.value || null,
-        image: imagePreview.value || ''
-      })
+      addLocalDummyRecord(recordPayload)
       successMsg.value = `${name.value} was successfully added to your directory!`
       resetForm()
       emit('refresh')
@@ -328,10 +333,10 @@ const submitForm = async () => {
     // Serverless API submission
     const formData = new FormData()
     formData.append('name', name.value)
-    formData.append('address', address.value)
+    formData.append('category', category.value)
     formData.append('contact', contact.value)
     if (email.value) formData.append('email', email.value)
-    formData.append('category', category.value)
+    formData.append('address', address.value)
     if (notes.value) formData.append('notes', notes.value)
 
     if (imageFile.value) {
@@ -351,15 +356,7 @@ const submitForm = async () => {
   } catch (err) {
     console.error('Submission failed:', err)
     // Fallback: If network or server error, save to local preview so user never loses work
-    addLocalDummyRecord({
-      name: name.value,
-      address: address.value,
-      contact: contact.value,
-      email: email.value || null,
-      category: category.value,
-      notes: notes.value || null,
-      image: imagePreview.value || ''
-    })
+    addLocalDummyRecord(recordPayload)
     successMsg.value = `${name.value} saved to your browser session (Offline / Local Storage)!`
     resetForm()
     emit('refresh')
@@ -370,4 +367,15 @@ const submitForm = async () => {
     }, 5000)
   }
 }
+
+// Expose state and methods for parent component control (e.g. preset selection in App.vue)
+defineExpose({
+  name,
+  category,
+  contact,
+  email,
+  address,
+  notes,
+  resetForm
+})
 </script>

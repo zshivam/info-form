@@ -1,21 +1,26 @@
-from fastapi import FastAPI, Form, UploadFile, File, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime
-from bson import ObjectId
-import re
+# ==============================================================================
+# Info Form API - Serverless FastAPI Backend for Vercel
+# ==============================================================================
+
 import os
+import re
 import uuid
 import base64
+from datetime import datetime
 from dotenv import load_dotenv
+from fastapi import FastAPI, Form, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
+from bson import ObjectId
 
 load_dotenv()
 
-app = FastAPI(title="Info Form API (Vercel Serverless)")
+app = FastAPI(title="inFOrm Directory Hub API", version="1.0.0")
 handler = app
 
-
-# Enable CORS for frontend on Vercel and localhost
+# ------------------------------------------------------------------------------
+# 1. CORS Configuration
+# ------------------------------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -24,25 +29,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/")
-@app.get("/api")
-@app.get("/api/health")
-def root_health():
-    return {"status": "ok", "message": "Info Form API is live and operational"}
-
-@app.get("/favicon.ico")
-def favicon():
-    return {}
-
-# MongoDB setup
+# ------------------------------------------------------------------------------
+# 2. Database Connection & Helpers
+# ------------------------------------------------------------------------------
 MONGODB_URI = os.getenv("MONGODB_URI") or os.getenv("MONGO_URI")
 DB_NAME = os.getenv("DB_NAME", "info_form_db")
 
 _client = None
 _db = None
 _use_memory = False
-
-# In-memory storage records initialized empty for fresh deployment
 _memory_records = []
 
 def init_mongo():
@@ -61,7 +56,7 @@ def init_mongo():
             )
             _client.admin.command('ping')
             _db = _client[DB_NAME]
-            print("Successfully connected to MongoDB!")
+            print("Successfully connected to MongoDB Atlas!")
     except Exception as e:
         print(f"MongoDB connection fallback: {e}")
         _use_memory = True
@@ -76,18 +71,20 @@ def record_helper(doc):
     if not doc:
         return {}
     return {
-        "id": str(doc["_id"]),
+        "id": str(doc.get("_id", "")),
         "name": doc.get("name", ""),
-        "address": doc.get("address", ""),
-        "contact": doc.get("contact", ""),
-        "email": doc.get("email"),
         "category": doc.get("category", "General"),
+        "contact": str(doc.get("contact", "")),
+        "email": doc.get("email"),
+        "address": doc.get("address", ""),
         "notes": doc.get("notes"),
         "image": doc.get("image", ""),
         "created_at": doc.get("created_at")
     }
 
-# In-memory storage fallback to ensure app runs immediately even before MONGODB_URI is configured
+# ------------------------------------------------------------------------------
+# 3. In-Memory Storage Fallback (Zero-Config local / preview mode)
+# ------------------------------------------------------------------------------
 def memory_insert(record_doc):
     rec_id = uuid.uuid4().hex[:12]
     doc = dict(record_doc)
@@ -106,49 +103,71 @@ def memory_delete(rec_id):
     _memory_records = [r for r in _memory_records if str(r.get("_id")) != str(rec_id)]
     return len(_memory_records) < before
 
+# ------------------------------------------------------------------------------
+# 4. API Endpoints (in logical order: Health -> Submit -> List -> Delete)
+# ------------------------------------------------------------------------------
+
+# Root & Healthcheck
 @app.get("/")
 @app.get("/api")
 @app.get("/api/")
-def read_root():
+@app.get("/api/health")
+def health_check():
     using_memory = not MONGODB_URI or _use_memory
     return {
         "status": "healthy",
-        "database": "in-memory (add MONGODB_URI in Vercel to persist permanently)" if using_memory else "MongoDB Atlas",
-        "message": "Info Form API is operational on Vercel!",
+        "service": "inFOrm Directory API",
+        "database": "in-memory (configure MONGODB_URI on Vercel to persist)" if using_memory else "MongoDB Atlas",
         "endpoints": {
-            "submit": "POST /submit or /api/submit",
-            "records": "GET /records or /api/records",
-            "delete": "DELETE /records/{id} or /api/records/{id}"
+            "health": "GET /api/health",
+            "submit": "POST /api/submit or /submit",
+            "records": "GET /api/records or /records",
+            "delete": "DELETE /api/records/{id} or /records/{id}"
         }
     }
 
+@app.get("/favicon.ico")
+def favicon():
+    return {}
+
+# Create Record (Submit)
 @app.post("/submit")
 @app.post("/submit/")
 @app.post("/api/submit")
 @app.post("/api/submit/")
 def submit_form(
     name: str = Form(...),
-    address: str = Form(""),
-    contact: int = Form(...),
-    email: str = Form(None),
     category: str = Form("General"),
+    contact: str = Form(...),
+    email: str = Form(None),
+    address: str = Form(""),
     notes: str = Form(None),
-    image: UploadFile = File(...)
+    image: UploadFile = File(None),
+    image_url: str = Form(None)
 ):
     try:
-        image_bytes = image.file.read()
-        content_type = image.content_type or "image/jpeg"
-        base64_encoded = base64.b64encode(image_bytes).decode("utf-8")
-        image_data_uri = f"data:{content_type};base64,{base64_encoded}"
+        final_image = ""
+
+        # Handle uploaded file
+        if image and hasattr(image, 'file'):
+            image_bytes = image.file.read()
+            if image_bytes:
+                content_type = image.content_type or "image/jpeg"
+                base64_encoded = base64.b64encode(image_bytes).decode("utf-8")
+                final_image = f"data:{content_type};base64,{base64_encoded}"
+
+        # Handle direct image URL fallback
+        if not final_image and image_url:
+            final_image = image_url.strip()
 
         record_doc = {
-            "name": name,
-            "address": address,
-            "contact": contact,
-            "email": email.strip() if email and email.strip() else None,
+            "name": name.strip(),
             "category": category.strip() if category and category.strip() else "General",
+            "contact": contact.strip(),
+            "email": email.strip() if email and email.strip() else None,
+            "address": address.strip(),
             "notes": notes.strip() if notes and notes.strip() else None,
-            "image": image_data_uri,
+            "image": final_image,
             "created_at": datetime.utcnow().isoformat()
         }
 
@@ -163,6 +182,7 @@ def submit_form(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save record: {str(e)}")
 
+# Read Records (List & Filter)
 @app.get("/records")
 @app.get("/records/")
 @app.get("/api/records")
@@ -191,17 +211,18 @@ def get_records(category: str = None, search: str = None):
                 q = search.strip().lower()
                 raw = [
                     r for r in raw
-                    if q in r.get("name", "").lower()
-                    or q in r.get("address", "").lower()
+                    if q in (r.get("name") or "").lower()
+                    or q in (r.get("address") or "").lower()
                     or q in str(r.get("contact", "")).lower()
                     or q in (r.get("email") or "").lower()
                     or q in (r.get("notes") or "").lower()
-                    or q in r.get("category", "").lower()
+                    or q in (r.get("category") or "").lower()
                 ]
             return [record_helper(doc) for doc in raw]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch records: {str(e)}")
 
+# Delete Record
 @app.delete("/records/{record_id}")
 @app.delete("/records/{record_id}/")
 @app.delete("/api/records/{record_id}")
@@ -223,3 +244,4 @@ def delete_record(record_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete record: {str(e)}")
+

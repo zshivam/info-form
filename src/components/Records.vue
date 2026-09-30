@@ -406,16 +406,30 @@ const categoryCounts = computed(() => {
   return counts
 })
 
+// Helper to resolve precise timestamp for consistent chronological ordering
+const getRecordTimestamp = (record) => {
+  if (record.created_at) {
+    const time = new Date(record.created_at).getTime()
+    if (!isNaN(time) && time > 0) return time
+  }
+  // If MongoDB ObjectId (24 hex chars), extract creation timestamp from first 8 chars
+  if (record.id && typeof record.id === 'string' && /^[0-9a-fA-F]{24}$/.test(record.id)) {
+    const seconds = parseInt(record.id.substring(0, 8), 16)
+    if (!isNaN(seconds) && seconds > 0) return seconds * 1000
+  }
+  return 0
+}
+
 // Filtered and Sorted Records
 const filteredRecords = computed(() => {
   let result = [...records.value]
 
-  // Category filter
+  // 1. Category filter
   if (selectedCategory.value !== 'All') {
     result = result.filter(r => (r.category || 'General') === selectedCategory.value)
   }
 
-  // Search filter
+  // 2. Search query filter
   if (searchQuery.value.trim()) {
     const q = searchQuery.value.trim().toLowerCase()
     result = result.filter(r => {
@@ -429,15 +443,15 @@ const filteredRecords = computed(() => {
     })
   }
 
-  // Sort
+  // 3. Place records in selected order
   if (sortBy.value === 'newest') {
-    result.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+    result.sort((a, b) => getRecordTimestamp(b) - getRecordTimestamp(a))
   } else if (sortBy.value === 'oldest') {
-    result.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0))
+    result.sort((a, b) => getRecordTimestamp(a) - getRecordTimestamp(b))
   } else if (sortBy.value === 'name_asc') {
-    result.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+    result.sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }))
   } else if (sortBy.value === 'name_desc') {
-    result.sort((a, b) => (b.name || '').localeCompare(a.name || ''))
+    result.sort((a, b) => (b.name || '').localeCompare(a.name || '', undefined, { sensitivity: 'base' }))
   }
 
   return result
@@ -581,6 +595,10 @@ const getWhatsAppUrl = (record) => {
 }
 
 defineExpose({
+  records,
+  selectedCategory,
+  sortBy,
+  viewMode,
   loadRecords,
   loadData: loadRecords
 })
